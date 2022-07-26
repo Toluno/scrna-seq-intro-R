@@ -24,6 +24,33 @@ data2d <- FindVariableFeatures(data2d, selection.method = "vst", nfeatures = 200
 
 
 ```
+```{r data2d-alone}
+top10 <- head(VariableFeatures(data2d), 10)
+
+plot1 <- VariableFeaturePlot(data2d)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot2
+
+all.genes <- rownames(data2d)
+data2d <- ScaleData(data2d, features = all.genes)
+
+data2d <- RunPCA(data2d, features = VariableFeatures(object = data))
+VizDimLoadings(data2d, dims = 1:2, reduction = "pca")
+DimPlot(data2d, reduction = "pca")
+
+data2d <- FindNeighbors(data2d, dims = 1:10)
+data2d <- FindClusters(data2d, resolution = 0.5)
+data2d <- RunUMAP(data2d, dims = 1:10)
+DimPlot(data2d, reduction = "umap")
+```
+```{r genes-of-interest}
+
+FeaturePlot(data2d, features = c("POU2F3","YAP1", "HES1","REST"))
+
+saveRDS(data2d, file = "./data/TO_2.rds")
+
+```
+
 
 ```{r integrate-seurat, echo=FALSE}
 features <- SelectIntegrationFeatures(object.list = c(data, data2d))
@@ -45,5 +72,10 @@ data.combined <- FindClusters(data.combined, resolution = 0.5)
 p1 <- DimPlot(data.combined, reduction = "umap", group.by = "orig.ident")
 p2 <- DimPlot(data.combined, reduction = "umap", label = TRUE, repel = TRUE)
 p1 + p2
+```
+```{r gene-plots}
+FeaturePlot(data.combined, features = c("YAP1", "HES1"), blend = TRUE)
+VlnPlot(data.combined, features = c("YAP1", "HES1"))
+
 ```
 
