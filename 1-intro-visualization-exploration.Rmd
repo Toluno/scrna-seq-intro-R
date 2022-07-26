@@ -161,7 +161,7 @@ DimPlot(data, reduction = "umap")
 We can now plot our features of interest on the UMAP:
 
 ```{r umap-features-of-interest}
-FeaturePlot(data, features = c("BEX1","YAP1", "HES1","REST"))
+FeaturePlot(data, features = c("BEX1","ALDH1A1", "HES1","REST"))
 ```
 
 Let's also save the output of this notebook so far:
