@@ -1,0 +1,50 @@
+---
+title: "InferCNV Analysis of TO_1"
+author: "Sarah Groves"
+date: "7/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# InferCNV
+
+```{r install, echo = FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+     install.packages("BiocManager")
+BiocManager::install("infercnv")
+
+#if problem with rjags, download JAGS and then it should work
+```
+
+```{r run-infercnv}
+library(infercnv)
+
+#load TO_1 if it isn't already loaded from notebook 1
+readRDS("./data/TO_1.rds")
+
+write.table(data@meta.data,"./data/TO_1_metadata.csv")
+
+indir <- "/Users/smgroves/Dropbox (VU Basic Sciences)/Quaranta_Lab/SCLC_data/scRNAseq/2022_pipseq_organoids/20220714_Quaranta_8332_pipseq/"
+
+raw_data<-Read10X(paste0(indir,"8332_TO_1/raw_matrix"))
+
+infercnv_obj = CreateInfercnvObject(raw_counts_matrix=    
+                                      paste0(indir,"8332_TO_1/raw_matrix/matrix.mtx"),
+                                    annotations_file= "./data/TO_1_seurat_clusters.csv",
+                                    delim=",",
+                                    gene_order_file=
+                                      "./data/gencode_v21_gen_pos.complete.txt",
+                                    ref_group_names=NULL) 
+
+infercnv_obj = infercnv::run(infercnv_obj,
+                             cutoff=1, # cutoff=1 works well for Smart-seq2, and cutoff=0.1 works well for 10x Genomics
+                             out_dir=tempfile(), 
+                             cluster_by_groups=TRUE, 
+                             denoise=TRUE,
+                             HMM=TRUE)
+```
+
+

@@ -1,0 +1,229 @@
+---
+title: "Introduction to Visualization and Data Exploration"
+author: "Sarah Groves"
+date: "7/22/2022"
+output: 
+    html_notebook:
+        toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Install libraries
+
+```{r install, echo = FALSE}
+# if these are not installed, uncomment the lines below to install them
+#install.packages("devtools")
+#install.packages("dplyr")
+#install.packages('Seurat')
+#devtools::install_github("thomasp85/patchwork")
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+library(dplyr)
+library(Seurat)
+library(patchwork)
+```
+
+# Downloading Data
+
+We would like to include two datasets: TO_1, which is a erebral organoid with H841 cells, and TO_2, which is H841 cells growing in 2D for a comparison. We will download both and save as Seurat objects, but in this notebook we'll focus on TO_1. In another notebook, we'll integrate the two datasets so we can directly compare them.
+
+To use this code, change the directory `indir` below.
+
+I am using Seurat to read in the data, and since the format is similar to 10X (a folder with matrix, barcodes, and features), I'm using the Read10X function. Interestingly, the data contains multiple labels for the genes, so it gets returned as a list containing matrices of each type. We mostly care about the `protein_coding` list, so we will build a Seurat object using just those genes, and filter out cells with fewer than 200 features, and genes with counts in fewer than 3 cells.
+
+```{r load-data}
+indir <- "/Users/smgroves/Dropbox (VU Basic Sciences)/Quaranta_Lab/SCLC_data/scRNAseq/2022_pipseq_organoids/20220714_Quaranta_8332_pipseq/"
+# raw_counts<-read.table(file=paste0(indir,"8332_TO_1/raw_matrix/matrix.mtx"),sep=",")
+# 
+# head(raw_counts)
+
+expression_matrix <- Read10X(data.dir = paste0(indir,"8332_TO_1/filtered_matrix/sensitivity_1"))
+data <- CreateSeuratObject(counts = expression_matrix$protein_coding, project = "TO_1", min.cells = 3, min.features = 200)
+data
+
+expr_2d <-Read10X(data.dir = paste0(indir,"8332_TO_2/filtered_matrix/sensitivity_1"))
+data2d <- CreateSeuratObject(counts = expr_2d$protein_coding, project = "TO_2", min.cells = 3, min.features = 200)
+data2d
+
+
+```
+ It looked like this filtered the protein-coding genes from 20024 to 15778 and did not filter cells (which makes sense, since we are using filtered data already from PIPseeker.) For the 2D data, the data is reduced from 20024 x 4236 to 16290 x 4236.
+ 
+ We can check at this point how many counts we find for each of the four TFs (ANPY).
+```{r echo = False}
+ASCL1_counts <- sum(expression_matrix$protein_coding['ASCL1',])
+NEUROD1_counts <- sum(expression_matrix$protein_coding['NEUROD1',])
+POU2F3_counts <- sum(expression_matrix$protein_coding['POU2F3',])
+YAP1_counts <- sum(expression_matrix$protein_coding['YAP1',])
+print("ASCL1 counts:")
+ASCL1_counts
+print("NEUROD1 counts:")
+NEUROD1_counts
+print("POU2F3 counts:")
+POU2F3_counts
+print("YAP1 counts:")
+YAP1_counts
+```
+We find that ASCL1 and NEUROD1 are dropped out of this dataset or are unexpressed.
+
+# Preprocessing
+
+## Quality Control
+First we'll do QC. This was already done with PIPseeker, so we probably don't need to filter anything else. 
+```{r qc}
+# Visualize QC metrics as a violin plot
+VlnPlot(data, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+FeatureScatter(data, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+```
+## Normalization and Scaling
+We will normalize the data (log-transform), find the highly variable features, and then scale the data. The Seurat object retains the normalized data in `data[["RNA"]]@data`, and will keep the scaled data in `data[["RNA"]]@scale.data`.
+```{r norm}
+data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
+
+```
+
+## Plotting genes of interest
+
+We can plot POU2F3 and YAP1 after normalization. These plots will be more interesting later, when we can look at different clusters in the data.
+
+```{r genes-of-interest}
+VlnPlot(data, features = c("POU2F3", "YAP1"))
+
+```
+## Finding variable genes
+
+```{r variable-feature}
+
+data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(data), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(data)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot2
+```
+
+```{r scaling}
+all.genes <- rownames(data)
+data <- ScaleData(data, features = all.genes)
+```
+
+# Dimensionality reduction and plotting
+
+## Run a PCA
+ After running a PCA, look at the genes driving the variance in the top dimensions.
+```{r pca}
+data <- RunPCA(data, features = VariableFeatures(object = data))
+VizDimLoadings(data, dims = 1:2, reduction = "pca")
+DimPlot(data, reduction = "pca")
+
+DimHeatmap(data, dims = 1:5, cells = 500, balanced = TRUE)
+
+```
+## Pick dimensionality
+Using two methods, we'll evaluate the best number of top PCs to keep for further analysis. None of the data will be lost, but our analyses like UMAP/tSNE below will only use the top N PCs for computational efficiency. Usually we keep between 10-30.
+
+```{r message = False, results='hide', fig.keep='all'}
+# NOTE: This process can take a long time for big datasets, comment out for expediency. More
+# approximate techniques such as those implemented in ElbowPlot() can be used to reduce
+# computation time
+data <- JackStraw(data, num.replicate = 100)
+data <- ScoreJackStraw(data, dims = 1:20)
+JackStrawPlot(data, dims = 1:15)
+ElbowPlot(data)
+
+```
+All of the top 15 PCs are well above the dotted line (normal distribution), and there is potentially an elbow in the elbow plot between 6-9 PCs. We'll keep 10 just to be safe. 
+
+## Clustering
+More information about the clustering method (Louvain) can be found in the Seurat tutorial. When you make a new DimPlot, the cells will automatically be colored by these new labels.
+
+```{r clustering, message = False, results='hide', fig.keep='all'}
+data <- FindNeighbors(data, dims = 1:10)
+data <- FindClusters(data, resolution = 0.5)
+DimPlot(data, reduction = "pca")
+
+```
+
+## Running a UMAP and tSNE Dmensionality Reduction
+
+```{r umap, message = False, results='hide', fig.keep='all'}
+data <- RunUMAP(data, dims = 1:10)
+DimPlot(data, reduction = "umap")
+
+```
+We can now plot our features of interest on the UMAP:
+
+```{r umap-features-of-interest}
+FeaturePlot(data, features = c("POU2F3","YAP1", "HES1","REST"))
+```
+
+Let's also save the output of this notebook so far:
+```{r save}
+saveRDS(data, file = "./data/TO_1.rds")
+```
+
+# Differentially Expressed Markers by Cluster
+
+```{r de-genes, message = False, results='hide',}
+data.markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+
+```
+```{r table-de}
+data.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 4, order_by = avg_log2FC)
+
+```
+```{r}
+data.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) -> top10
+DoHeatmap(data, features = top10$gene) + NoLegend()
+```
+
+### Clusters 0, 2, 3, 4, and 6
+- Enriched in 0: H1-2, H2AC18, H2AC19, MT-ND3: histone stuff and mitochondrial gene
+- Enriched in 2:FTL, PTTG1, FTH1, HOATZ
+  - FTL: This gene encodes the light subunit of the ferritin protein. Ferritin is the major intracellular iron storage protein in prokaryotes and eukaryotes
+  - PTTG1: Regulatory protein, which plays a central role in chromosome stability, in the p53/TP53 pathway, and DNA repair.
+  - FTH1: This gene encodes the heavy subunit of ferritin
+  - HOATZ: Required for motile ciliogenesis and flagellar genesis by mediating the maturation of the glycolytic enzyme ENO4.
+- Enriched in 3: MAP2, PEG10, CYSTM1, TENM3
+- Enriched in 4: PCNA, RRN2, CENPU, DHFR
+- Enriched in 6: HMGB2, UBE2C, CCNB1, KPNA2
+
+### Clusters 1 and 7
+- Enriched in 1: BEX1, CAV1, CCN2, DHRS2
+    - BEX1: Signaling adapter molecule involved in p75NTR/NGFR signaling. Plays a role in cell cycle progression and neuronal differentiation. Inhibits neuronal differentiation in response to nerve growth factor (NGF). May act as a link between the cell cycle and neurotrophic factor signaling, possibly by functioning as an upstream modulator of receptor signaling, coordinating biological responses to external signals with internal cellular states (**Muller glia cells, brain, pituitary gland**).
+    - CAV1: Caveolin-1,major component of caveolae; endocytosis, maintain cell structure, etc. The protein links integrin subunits to the tyrosine kinase FYN, an initiating step in coupling integrins to the Ras-ERK pathway and promoting cell cycle progression. The gene is a tumor suppressor gene candidate and a negative regulator of the Ras-p42/44 mitogen-activated kinase cascade. (**Adipocytes and endothelial cells**)
+    - CCN2: The protein encoded by this gene is a mitogen that is secreted by vascular endothelial cells. The encoded protein plays a role in chondrocyte proliferation and differentiation, cell adhesion in many cell types, and is related to platelet-derived growth factor. (**Fibroblasts, smooth muscle cells, adipocytes**)
+    - DHRS2:  dehydrogenases/reductases (SDR) family (**Fibroblasts, urinary**)
+- Enriched in 7: CALD1, DHRS2, UACA, SGK1
+  - CALD1: This gene encodes a calmodulin- and actin-binding protein that plays an essential role in the regulation of smooth muscle and nonmuscle contraction. (**Smooth muscle cells, Sertoli cells, endocrine cells**)
+  - UACA: This gene encodes a protein that contains ankyrin repeats and coiled coil domains and likely plays a role in apoptosis. (**High in adipocytes, endothelial, cardiomyocytes, microglial cells**)
+  - SGK1: This gene encodes a serine/threonine protein kinase that plays an important role in cellular stress response. This kinase activates certain potassium, sodium, and chloride channels, suggesting an involvement in the regulation of processes such as cell survival, neuronal excitability, and renal sodium excretion.(**Langerhans cells, enterocytes**)
+
+### Cluster 5
+- Enriched in 5: EMP1, DHRS2, SOX4, CCDC167
+  - EMP1: Involved in bleb assembly and cell death. Located in plasma membrane. (**esophagus, epithelial**)
+  - SOX4:regulation of embryonic development (**lymphoid tissue, ionocytes, endocrine cells**)
+  - CCDC167: Predicted to be integral component of membrane. (**Brain and lymphoid**)
+  
+```{r save2}
+saveRDS(data, file = "./data/TO_1.rds")
+saveRDS(data2d, file = "./data/TO_2.rds")
+```
+
+```{r}
+sessionInfo()
+
+```
+

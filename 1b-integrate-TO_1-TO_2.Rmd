@@ -1,0 +1,49 @@
+---
+title: "Integration of TO_1 and TO_2"
+author: "Sarah Groves"
+date: "7/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r read-data}
+readRDS("./data/TO_1.rds") #reads in data, which was normalized in 1
+readRDS("./data/TO_2.rds") # reads in data2d, which has not been preprocessed
+
+data2d <- NormalizeData(data2d, normalization.method = "LogNormalize", scale.factor = 10000)
+data2d <- FindVariableFeatures(data2d, selection.method = "vst", nfeatures = 2000)
+
+
+```
+
+```{r integrate-seurat, echo=FALSE}
+features <- SelectIntegrationFeatures(object.list = c(data, data2d))
+anchors <- FindIntegrationAnchors(object.list = c(data, data2d), anchor.features = features)
+data.combined <- IntegrateData(anchorset = anchors)
+
+```
+
+```{r integrated-analysis}
+DefaultAssay(data.combined) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+data.combined <- ScaleData(data.combined, verbose = FALSE)
+data.combined <- RunPCA(data.combined, npcs = 30, verbose = FALSE)
+data.combined <- RunUMAP(data.combined, reduction = "pca", dims = 1:30)
+data.combined <- FindNeighbors(data.combined, reduction = "pca", dims = 1:30)
+data.combined <- FindClusters(data.combined, resolution = 0.5)
+
+p1 <- DimPlot(data.combined, reduction = "umap", group.by = "orig.ident")
+p2 <- DimPlot(data.combined, reduction = "umap", label = TRUE, repel = TRUE)
+p1 + p2
+```
+
