@@ -2,7 +2,9 @@
 title: "Integration of TO_1 and TO_2"
 author: "Sarah Groves"
 date: "7/25/2022"
-output: html_document
+output: 
+    html_notebook:
+        toc: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -45,7 +47,7 @@ DimPlot(data2d, reduction = "umap")
 ```
 ```{r genes-of-interest}
 
-FeaturePlot(data2d, features = c("POU2F3","YAP1", "HES1","REST"))
+FeaturePlot(data2d, features = c("SOX4",'BEX1',"YAP1", "HES1","REST"))
 
 saveRDS(data2d, file = "./data/TO_2.rds")
 
