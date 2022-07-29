@@ -85,12 +85,11 @@ FeaturePlot(data.combined, features = c("YAP1", "HES1"), blend = TRUE)
 VlnPlot(data.combined, features = c("YAP1", "HES1"))
 
 ```
-```{r}
-data.markers <- FindAllMarkers(data.combined, group_by="orig.ident", only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
 
-```
 
-```{r}
+```{r message = False, results='hide', fig.keep='all'}
+# DefaultAssay(data.combined) <- "integrated"
+
 Idents(data.combined) <- "orig.ident"
 data.markers <- FindAllMarkers(data.combined, group_by="orig.ident", only.pos = TRUE)
 
@@ -120,6 +119,20 @@ data.combined <- FindClusters(data.combined, resolution = 0.5)
 p1 <- DimPlot(data.combined, reduction = "umap", group.by = "orig.ident")
 p2 <- DimPlot(data.combined, reduction = "umap", label = TRUE, repel = TRUE)
 p1 + p2
+```
+
+```{r message = False, results='hide', fig.keep='all'}
+DefaultAssay(data.combined) <- "RNA"
+
+Idents(data.combined) <- "orig.ident"
+data.markers <- FindAllMarkers(data.combined, group_by="orig.ident", only.pos = TRUE)
+
+data.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC)
+# 
+# VlnPlot(data.combined, features = data.markers$gene,  dot.scale = 8, split.by = "orig.ident") +
+#     RotatedAxis()
 ```
 
 ```{r}
