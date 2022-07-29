@@ -18,11 +18,12 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r read-data}
-install.packages('dplyr')
-install.packages("dbplyr")
+# install.packages('dplyr')
+# install.packages("dbplyr")
 library(dplyr)
-readRDS("./data/TO_1.rds") #reads in data, which was normalized in 1
-readRDS("./data/TO_2.rds") # reads in data2d, which has not been preprocessed
+library(Seurat)
+data<-readRDS("./data/TO_1.rds") #reads in data, which was normalized in 1
+data2d<-readRDS("./data/TO_2.rds") # reads in data2d, which has not been preprocessed
 
 data2d <- NormalizeData(data2d, normalization.method = "LogNormalize", scale.factor = 10000)
 data2d <- FindVariableFeatures(data2d, selection.method = "vst", nfeatures = 2000)
@@ -96,12 +97,32 @@ data.markers <- FindAllMarkers(data.combined, group_by="orig.ident", only.pos = 
 data.markers %>%
     group_by(cluster) %>%
     slice_max(n = 10, order_by = avg_log2FC)
-
-DotPlot(data.combined, features = data.markers$gene, cols = c("blue", "red"), dot.scale = 8, split.by = "orig.ident") +
-    RotatedAxis()
+# 
+# VlnPlot(data.combined, features = data.markers$gene,  dot.scale = 8, split.by = "orig.ident") +
+#     RotatedAxis()
 ```
 ```{r}
 saveRDS(data.combined, file = "./data/combined_TO_1_2.rds")
 
+```
+
+```{r compare-samples}
+DefaultAssay(data.combined) <- "RNA"
+
+# Run the standard workflow for visualization and clustering
+data.combined <- ScaleData(data.combined, verbose = FALSE)
+data.combined <- FindVariableFeatures(data.combined, selection.method = "vst", nfeatures = 2000)
+data.combined <- RunPCA(data.combined, npcs = 30, verbose = FALSE)
+data.combined <- RunUMAP(data.combined, reduction = "pca", dims = 1:30)
+data.combined <- FindNeighbors(data.combined, reduction = "pca", dims = 1:30)
+data.combined <- FindClusters(data.combined, resolution = 0.5)
+
+p1 <- DimPlot(data.combined, reduction = "umap", group.by = "orig.ident")
+p2 <- DimPlot(data.combined, reduction = "umap", label = TRUE, repel = TRUE)
+p1 + p2
+```
+
+```{r}
+sessionInfo()
 ```
 
