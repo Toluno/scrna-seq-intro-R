@@ -22,9 +22,12 @@ When you click the **Knit** button a document will be generated that includes bo
 # install.packages("dbplyr")
 library(dplyr)
 library(Seurat)
-data<-readRDS("./data/TO_1.rds") #reads in data, which was normalized in 1
-data2d<-readRDS("./data/TO_2.rds") # reads in data2d, which has not been preprocessed
 
+#Reads in dataset 1 (CO+H841)
+#data<-readRDS("./data/TO_1.rds") #reads in data, which was normalized in 1
+#data2d<-readRDS("./data/TO_2.rds") # reads in data2d, which has not been preprocessed
+
+#Normalization and Variable Features for dataset 2 (2D H841)
 data2d <- NormalizeData(data2d, normalization.method = "LogNormalize", scale.factor = 10000)
 data2d <- FindVariableFeatures(data2d, selection.method = "vst", nfeatures = 2000)
 
@@ -81,7 +84,8 @@ p2 <- DimPlot(data.combined, reduction = "umap", label = TRUE, repel = TRUE)
 p1 + p2
 ```
 ```{r gene-plots}
-FeaturePlot(data.combined, features = c("YAP1", "HES1"), blend = TRUE)
+Idents(data.combined)<-"orig.ident"
+FeaturePlot(data.combined, features = c("YAP1", "HES1"), blend = TRUE, reduction="umap")
 VlnPlot(data.combined, features = c("YAP1", "HES1"))
 
 ```

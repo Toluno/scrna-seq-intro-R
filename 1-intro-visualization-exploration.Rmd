@@ -102,7 +102,7 @@ VlnPlot(data, features = c("POU2F3", "YAP1"))
 data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
 
 # Identify the 10 most highly variable genes
-top10 <- head(VariableFeatures(data), 10)
+top10 <- head(VariableFeatures(data), 30)
 
 # plot variable features with and without labels
 plot1 <- VariableFeaturePlot(data)
@@ -162,7 +162,7 @@ DimPlot(data, reduction = "umap")
 We can now plot our features of interest on the UMAP:
 
 ```{r umap-features-of-interest}
-FeaturePlot(data, features = c("BEX1","ALDH1A1", "HES1","REST"))
+FeaturePlot(data, features = c("BEX1","ALDH1A1", "HES1","REST", "ANXA1"))
 ```
 
 Let's also save the output of this notebook so far:
@@ -180,13 +180,13 @@ data.markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.thre
 ```{r table-de}
 data.markers %>%
     group_by(cluster) %>%
-    slice_max(n = 4, order_by = avg_log2FC)
+    slice_max(n = 6, order_by = avg_log2FC)
 
 ```
 ```{r}
 data.markers %>%
     group_by(cluster) %>%
-    top_n(n = 10, wt = avg_log2FC) -> top10
+    top_n(n = 5, wt = avg_log2FC) -> top10
 DoHeatmap(data, features = top10$gene) + NoLegend()
 ```
 
