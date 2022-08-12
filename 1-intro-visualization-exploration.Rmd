@@ -18,6 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #install.packages("devtools")
 #install.packages("dplyr")
 #install.packages('Seurat')
+#install.packages(c("rmarkdown","knitr"))
 #devtools::install_github("thomasp85/patchwork")
 if (!require("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
@@ -35,7 +36,7 @@ To use this code, change the directory `indir` below.
 I am using Seurat to read in the data, and since the format is similar to 10X (a folder with matrix, barcodes, and features), I'm using the Read10X function. Interestingly, the data contains multiple labels for the genes, so it gets returned as a list containing matrices of each type. We mostly care about the `protein_coding` list, so we will build a Seurat object using just those genes, and filter out cells with fewer than 200 features, and genes with counts in fewer than 3 cells.
 
 ```{r load-data}
-indir <- "/Users/smgroves/Dropbox (VU Basic Sciences)/Quaranta_Lab/SCLC_data/scRNAseq/2022_pipseq_organoids/20220714_Quaranta_8332_pipseq/"
+indir <- "C:/Users/omoke/Documents/20220714_Quaranta_8332_pipseq/"
 # raw_counts<-read.table(file=paste0(indir,"8332_TO_1/raw_matrix/matrix.mtx"),sep=",")
 # 
 # head(raw_counts)
